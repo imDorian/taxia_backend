@@ -34,10 +34,11 @@ async function getWeather(req, res) {
 }
 
 async function getMessage(req, res) {
-    const { lat, lon } = req.query;
-    const events = await getTicketMaster(lat, lon);
+    const { geoPoint } = req.query;
+    console.log(geoPoint, "geoPoint");
+    const events = await getTicketMaster(geoPoint);
+    console.log(events, "events");
     const context = contextIA.concat(JSON.stringify(events));
-    console.log(context);
 
     const response = await ai.models.generateContentStream({
         model: "gemini-2.0-flash",
@@ -109,7 +110,6 @@ async function getMessage(req, res) {
 
     let responseObj = "";
     for await (const chunk of response) {
-        // console.log("data", chunk.text);
         for (const letter of chunk.text) {
             if (letter === "{") {
                 responseObj += letter;
@@ -128,27 +128,32 @@ async function getMessage(req, res) {
     res.end();
 }
 
-async function getTicketMaster(lat, lon) {
+async function getTicketMaster(geoPoint) {
 
-    const url = `https://app.ticketmaster.com/discovery/v2/events.json?countryCode=ES&apikey=${process.env.TICKET_KEY}&locale=es-es&sort=distance,date,asc&geoPoint=${lat},${lon}`;
+    const url = `https://app.ticketmaster.com/discovery/v2/events.json?countryCode=ES&apikey=${process.env.TICKET_KEY}&locale=es-es&sort=relevance,desc&geoPoint=${geoPoint}&unit=km`
+    // ;
+    const url2 = `https://app.ticketmaster.com/discovery/v2/attractions.json?apikey=${process.env.TICKET_KEY}&locale=es-es&geoPoint=${geoPoint}`;
+    const url3 = `https://app.ticketmaster.com/discovery/v2/suggest.json?apikey=${process.env.TICKET_KEY}&sort=distance,asc&geoPoint=${geoPoint}&locale=es-es`;
     const response = await fetch(url);
     const json = await response.json();
-    const events = json._embedded.events.map(event => {
+    const events = json._embedded.events?.map(event => {
+        console.log(event, "event");
         return {
             name: event.name,
             image: event.images[1].url,
-            venue: event._embedded.venues[0].name,
-            street: event._embedded.venues[0].address.line1,
-            city: event._embedded.venues[0].city.name,
-            country: event._embedded.venues[0].country.name,
+            venue: event._embedded.venues[0]?.name,
+            street: event._embedded.venues[0]?.address?.line1,
+            city: event._embedded.venues[0]?.city?.name,
+            country: event._embedded.venues[0]?.country?.name,
             date: event.dates.start.dateTime,
             url: event.url,
             distance: event.distance,
         }
     });
-    // console.log(events);
+    console.log(response, "events");
 
     return events;
+
 }
 
 
