@@ -1,22 +1,19 @@
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { contextIA } from '../utils/contextIA.js';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { io } from '../server.js';
+
 
 dotenv.config();
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_KEY,
 });
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 
 async function getWeather(req, res) {
-    // const lat = req.query.lat;
-    // const lon = req.query.lon;
-    const lat = 40.416775;
-    const lon = -3.70379;
+    const { lat, lon } = req.query;
+    console.log(lat, lon, "lat y lon");
     const API_key = process.env.API_KEY;
     const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_key}&lang=es&units=metric`;
 
@@ -37,21 +34,124 @@ async function getWeather(req, res) {
 }
 
 async function getMessage(req, res) {
+    const { lat, lon } = req.query;
+    const events = await getTicketMaster(lat, lon);
+    const context = contextIA.concat(JSON.stringify(events));
+    console.log(context);
 
-    const response = await ai.models.generateContent({
+    const response = await ai.models.generateContentStream({
         model: "gemini-2.0-flash",
-        contents: contextIA,
+        contents: context,
         config: {
-            maxOutputTokens: 1000,
-            temperature: 2,
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        'name': {
+                            type: Type.STRING,
+                            description: 'Name of the event',
+                            nullable: false,
+                        },
+                        'image': {
+                            type: Type.STRING,
+                            description: 'Image of the event',
+                            nullable: false,
+                        },
+                        'venue': {
+                            type: Type.STRING,
+                            description: 'Venue of the event',
+                            nullable: false,
+                        },
+                        'street': {
+                            type: Type.STRING,
+                            description: 'Street of the event',
+                            nullable: false,
+                        },
+                        'city': {
+                            type: Type.STRING,
+                            description: 'City of the event',
+                            nullable: false,
+                        },
+                        'country': {
+                            type: Type.STRING,
+                            description: 'Country of the event',
+                            nullable: false,
+                        },
+                        'date': {
+                            type: Type.STRING,
+                            description: 'Date of the event',
+                            nullable: false,
+                        },
+                        'url': {
+                            type: Type.STRING,
+                            description: 'URL of the event',
+                            nullable: false,
+                        },
+                        'distance': {
+                            type: Type.NUMBER,
+                            description: 'Distance of the event',
+                            nullable: false,
+                        },
+                        'id': {
+                            type: Type.STRING,
+                            description: 'unique id, never repeat',
+                            nullable: false,
+
+                        }
+                    },
+                    required: ['name', 'image', 'venue', 'street', 'city', 'country', 'date', 'url', 'distance', 'id'],
+                },
+            },
         },
     });
 
-    const responseText = (response.text).replace(/```json/g, '').replace(/```/g, '');
-    console.log(responseText);
-    res.status(200).json(responseText);
+    let responseObj = "";
+    for await (const chunk of response) {
+        // console.log("data", chunk.text);
+        for (const letter of chunk.text) {
+            if (letter === "{") {
+                responseObj += letter;
+            }
+            if (responseObj.length > 0 && letter !== "}" && letter !== "{") {
+                responseObj += letter;
+            }
+            if (letter === "}") {
+                responseObj += letter;
+                io.emit("newMessage", JSON.parse(responseObj));
+                responseObj = "";
+            }
+        }
 
+    }
+    res.end();
+}
+
+async function getTicketMaster(lat, lon) {
+
+    const url = `https://app.ticketmaster.com/discovery/v2/events.json?countryCode=ES&apikey=${process.env.TICKET_KEY}&locale=es-es&sort=distance,date,asc&geoPoint=${lat},${lon}`;
+    const response = await fetch(url);
+    const json = await response.json();
+    const events = json._embedded.events.map(event => {
+        return {
+            name: event.name,
+            image: event.images[1].url,
+            venue: event._embedded.venues[0].name,
+            street: event._embedded.venues[0].address.line1,
+            city: event._embedded.venues[0].city.name,
+            country: event._embedded.venues[0].country.name,
+            date: event.dates.start.dateTime,
+            url: event.url,
+            distance: event.distance,
+        }
+    });
+    // console.log(events);
+
+    return events;
 }
 
 
-export { getMessage, getWeather };      
+
+
+export { getMessage, getWeather, getTicketMaster };      
