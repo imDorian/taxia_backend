@@ -85,6 +85,11 @@ async function getMessage(req, res) {
                             description: 'Date of the event',
                             nullable: false,
                         },
+                        'endDate': {
+                            type: Type.STRING,
+                            description: 'Fecha y hora de finalización del evento, si no está disponible, hacer una estimación',
+                            nullable: false,
+                        },
                         'url': {
                             type: Type.STRING,
                             description: 'URL of the event',
@@ -95,9 +100,14 @@ async function getMessage(req, res) {
                             description: 'Distance of the event',
                             nullable: false,
                         },
+                        'reason': {
+                            type: Type.STRING,
+                            description: 'El motivo por el que se ha seleccionado el evento',
+                            nullable: false,
+                        },
                         'id': {
                             type: Type.STRING,
-                            description: 'unique id, never repeat',
+                            description: 'id of the event',
                             nullable: false,
 
                         }
@@ -148,6 +158,7 @@ async function getTicketMaster(geoPoint) {
             date: event.dates.start.dateTime,
             url: event.url,
             distance: event.distance,
+            id: event.id,
         }
     });
     console.log(response, "events");

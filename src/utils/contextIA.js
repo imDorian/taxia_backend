@@ -5,8 +5,7 @@ Tu tarea es analizarlo y generar una lista en formato JSON de los lugares con ma
 
  
 Hora actual: ${new Date().toLocaleTimeString('es-ES')}
-
-Para cada lugar, devuelve un objeto con los siguientes campos (en una lista JSON ordenada por fecha de evento, de más cercano a más lejano):
+ (en una lista JSON ordenada por fecha de evento, de más cercano a más lejano):
             
 
 No inventes información. Si algún dato no está disponible en el JSON de entrada, omítelo en el resultado.  

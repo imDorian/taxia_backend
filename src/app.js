@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { chatRoutes } from './routes/chat.js';
 import { io } from './server.js';
+import run from './utils/mongo.js';
 
 dotenv.config();
 const app = express();
@@ -18,5 +19,5 @@ app.use('/chat', (req, res, next) => {
     next();
 }, chatRoutes);
 
-
+run();
 export default app;
