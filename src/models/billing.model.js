@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 import Uber from './uber.model.js';
 import Bolt from './bolt.model.js';
 import Cabify from './cabify.model.js';
-import FreeNow from './freeNow.model.js';
+import FreeNow from './freenow.model.js';
 
 const billingSchema = new Schema({
     earnings: {
