@@ -6,6 +6,10 @@ import { io } from '../server.js';
 
 dotenv.config();
 
+const API_URL = 'http://api.aviationstack.com/v1/timetable';
+const API_KEY = process.env.AVIATION_KEY;
+const IATA_CODE = 'MAD';
+
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_KEY,
 });
@@ -34,108 +38,112 @@ async function getWeather(req, res) {
 }
 
 async function getMessage(req, res) {
-    const { geoPoint } = req.query;
-    console.log(geoPoint, "geoPoint");
-    const events = await getTicketMaster(geoPoint);
-    console.log(events, "events");
-    const context = contextIA.concat(JSON.stringify(events));
+    try {
+        const { geoPoint } = req.query;
+        // console.log(geoPoint, "geoPoint");
+        const events = await getTicketMaster(geoPoint);
+        const arrivals = await getArrivalsWithin12Hours();
+        // console.log(events, "events");
+        const context = JSON.stringify(events).concat(JSON.stringify(arrivals)).concat(contextIA);
+        console.log(context, "context");
 
-    const response = await ai.models.generateContentStream({
-        model: "gemini-2.0-flash",
-        contents: context,
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        'name': {
-                            type: Type.STRING,
-                            description: 'Name of the event',
-                            nullable: false,
-                        },
-                        'image': {
-                            type: Type.STRING,
-                            description: 'Image of the event',
-                            nullable: false,
-                        },
-                        'venue': {
-                            type: Type.STRING,
-                            description: 'Venue of the event',
-                            nullable: false,
-                        },
-                        'street': {
-                            type: Type.STRING,
-                            description: 'Street of the event',
-                            nullable: false,
-                        },
-                        'city': {
-                            type: Type.STRING,
-                            description: 'City of the event',
-                            nullable: false,
-                        },
-                        'country': {
-                            type: Type.STRING,
-                            description: 'Country of the event',
-                            nullable: false,
-                        },
-                        'date': {
-                            type: Type.STRING,
-                            description: 'Date of the event',
-                            nullable: false,
-                        },
-                        'endDate': {
-                            type: Type.STRING,
-                            description: 'Fecha y hora de finalización del evento, si no está disponible, hacer una estimación',
-                            nullable: false,
-                        },
-                        'url': {
-                            type: Type.STRING,
-                            description: 'URL of the event',
-                            nullable: false,
-                        },
-                        'distance': {
-                            type: Type.NUMBER,
-                            description: 'Distance of the event',
-                            nullable: false,
-                        },
-                        'reason': {
-                            type: Type.STRING,
-                            description: 'El motivo por el que se ha seleccionado el evento',
-                            nullable: false,
-                        },
-                        'id': {
-                            type: Type.STRING,
-                            description: 'id of the event',
-                            nullable: false,
+        const response = await ai.models.generateContentStream({
+            model: "gemini-2.0-flash",
+            contents: context,
+            config: {
+                // tokenLimit: 6000,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            'timeRange': {
+                                type: Type.STRING,
+                                description: 'Hora de inicio y fin del evento',
+                                nullable: false,
+                            },
+                            'image': {
+                                type: Type.STRING,
+                                description: 'URL de la imagen del evento',
+                                nullable: false,
+                            },
+                            'locationName': {
+                                type: Type.STRING,
+                                description: 'Nombre del lugar del evento',
+                                nullable: false,
+                            },
+                            'reason': {
+                                type: Type.STRING,
+                                description: 'Motivo por el que se ha seleccionado el evento',
+                                nullable: false,
+                            },
+                            'arrivalTime': {
+                                type: Type.STRING,
+                                description: 'Hora de llegada al evento',
+                                nullable: false,
+                            },
+                            'departureTime': {
+                                type: Type.STRING,
+                                description: 'Hora de salida del evento',
+                                nullable: false,
+                            },
+                            'demandLevel': {
+                                type: Type.STRING,
+                                description: 'Nivel de afluencia en el evento',
+                                nullable: false,
+                            },
+                            'googleMaps': {
+                                type: Type.STRING,
+                                description: 'URL de Google Maps del evento',
+                                nullable: false,
+                            },
+                            'waze': {
+                                type: Type.STRING,
+                                description: 'URL de Waze del evento',
+                                nullable: false,
+                            },
+                            'notes': {
+                                type: Type.STRING,
+                                description: 'Notas adicionales sobre el evento',
+                                nullable: false,
+                            },
+                            'id': {
+                                type: Type.STRING,
+                                description: 'inventate un id para cada evento',
+                                nullable: false,
 
-                        }
+                            }
+                        },
+                        required: ['timeRange', 'locationName', 'reason', 'arrivalTime', 'departureTime', 'demandLevel', 'googleMaps', 'waze', 'notes', 'id'],
                     },
-                    required: ['name', 'image', 'venue', 'street', 'city', 'country', 'date', 'url', 'distance', 'id'],
                 },
             },
-        },
-    });
+        });
 
-    let responseObj = "";
-    for await (const chunk of response) {
-        for (const letter of chunk.text) {
-            if (letter === "{") {
-                responseObj += letter;
+        let responseObj = "";
+        for await (const chunk of response) {
+            console.log(chunk.text);
+            for (const letter of chunk.text) {
+                if (letter === "{") {
+                    responseObj += letter;
+                }
+                if (responseObj.length > 0 && letter !== "}" && letter !== "{") {
+                    responseObj += letter;
+                }
+                if (letter === "}") {
+                    responseObj += letter;
+                    io.emit("newMessage", JSON.parse(responseObj));
+                    responseObj = "";
+                }
             }
-            if (responseObj.length > 0 && letter !== "}" && letter !== "{") {
-                responseObj += letter;
-            }
-            if (letter === "}") {
-                responseObj += letter;
-                io.emit("newMessage", JSON.parse(responseObj));
-                responseObj = "";
-            }
+
         }
+        res.end();
 
+    } catch (error) {
+        console.log(error.message, "error");
     }
-    res.end();
 }
 
 async function getTicketMaster(geoPoint) {
@@ -147,7 +155,6 @@ async function getTicketMaster(geoPoint) {
     const response = await fetch(url);
     const json = await response.json();
     const events = json._embedded.events?.map(event => {
-        console.log(event, "event");
         return {
             name: event.name,
             image: event.images[1].url,
@@ -161,13 +168,46 @@ async function getTicketMaster(geoPoint) {
             id: event.id,
         }
     });
-    console.log(response, "events");
 
     return events;
 
 }
 
+async function getArrivalsWithin12Hours() {
+    const now = new Date();
+    const in12h = new Date(now.getTime() + 12 * 60 * 60 * 1000);
 
+    const dateStr = now.toISOString().split('T')[0];
 
+    const url = `${API_URL}?access_key=${API_KEY}&iataCode=${IATA_CODE}&type=arrival&date=${dateStr}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const filtered = data.data.filter(flight => {
+            const arrivalTimeStr = flight.arrival?.scheduledTime;
+            if (!arrivalTimeStr) return false;
+            const arrivalDate = new Date(arrivalTimeStr);
+            return arrivalDate >= now && arrivalDate <= in12h;
+        });
+
+        const arrivals = filtered.map(f => {
+            return {
+                airline: f.airline.name,
+                terminal: f.arrival.terminal,
+                scheduledTime: f.arrival.scheduledTime,
+                delay: f.arrival?.delay,
+                status: f.status,
+                departureCode: f.departure.iataCode,
+                id: f.flight.iataNumber,
+            }
+        });
+        return arrivals;
+
+    } catch (err) {
+        console.error('Error al consultar vuelos:', err);
+    }
+}
 
 export { getMessage, getWeather, getTicketMaster };      

@@ -1,10 +1,9 @@
 import mongoose from 'mongoose';
 const Schema = mongoose.Schema;
-import Fuel from './fuel.model';
-import Uber from './uber.model';
-import Bolt from './bolt.model';
-import Cabify from './cabify.model';
-import FreeNow from './freeNow.model';
+import Uber from './uber.model.js';
+import Bolt from './bolt.model.js';
+import Cabify from './cabify.model.js';
+import FreeNow from './freeNow.model.js';
 
 const billingSchema = new Schema({
     earnings: {
@@ -14,20 +13,20 @@ const billingSchema = new Schema({
             cash: { type: String, required: true },
         }, required: true
     },
-    error: {
+    mistakes: {
         type: {
-            errors: { type: String, required: true },
-            amount: { type: String, required: true },
+            mistakes: { type: String, required: false },
+            amount: { type: String, required: false },
         }, required: false
     },
-    fuel: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Fuel' }],
+    fuel: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Fuel' }, { required: false }],
     apps: {
         type: {
             uber: { type: Uber.schema, required: false },
             bolt: { type: Bolt.schema, required: false },
             cabify: { type: Cabify.schema, required: false },
             freeNow: { type: FreeNow.schema, required: false }
-        }
+        }, required: false
     },
     date: { type: Date, required: true },
     description: { type: String, required: false },
