@@ -19,7 +19,7 @@ const billingSchema = new Schema({
             amount: { type: String, required: false },
         }, required: false
     },
-    fuel: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Fuel' }, { required: false }],
+    fuel: { type: mongoose.Schema.Types.ObjectId, ref: 'Fuel', required: false },
     apps: {
         type: {
             uber: { type: Uber.schema, required: false },

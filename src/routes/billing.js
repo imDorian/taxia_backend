@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { createBilling } from '../controllers/billing.js';
+import { createBilling, getBilling } from '../controllers/billing.js';
 
 const billingRouter = Router();
 
 billingRouter.post('/create-billing', createBilling);
+billingRouter.get('/get-billing', getBilling);
 
 export { billingRouter };
 

@@ -29,7 +29,8 @@ export const createBilling = async (req, res) => {
 
 export const getBilling = async (req, res) => {
     try {
-        const billing = await Billing.find();
+        const billing = await Billing.find().populate('fuel');
+        console.log(billing, "billing");
         res.status(200).json(billing);
     } catch (error) {
         res.status(500).json({ message: error.message });
