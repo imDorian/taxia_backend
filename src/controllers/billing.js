@@ -15,21 +15,23 @@ export const createBilling = async (req, res) => {
             const newFuel = new Fuel(fuel)
             const savedFuel = await newFuel.save();
             billing.fuel = savedFuel._id;
-            await billing.save();
+            (await billing.save());
             console.log(billing, "billing with fuel");
         } else {
             await billing.save();
             console.log(billing, "only billing");
         }
-        res.status(201).json(billing);
+        const billingWithFuel = await Billing.findById(billing._id).populate('fuel');
+        res.status(201).json(billingWithFuel);
     } catch (error) {
         res.status(500).json({ message: error.message });
+        console.log(error, "error");
     }
 };
 
 export const getBilling = async (req, res) => {
     try {
-        const billing = await Billing.find().populate('fuel');
+        const billing = await Billing.find().sort({ date: -1 }).populate('fuel');
         console.log(billing, "billing");
         res.status(200).json(billing);
     } catch (error) {
@@ -57,4 +59,14 @@ export const deleteBilling = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const getBillingById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const billing = await Billing.findById(id).populate('fuel');
+        res.status(200).json(billing);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
 
