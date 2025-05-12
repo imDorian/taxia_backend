@@ -54,7 +54,8 @@ export const deleteBilling = async (req, res) => {
     try {
         const { id } = req.params;
         await Billing.findByIdAndDelete(id);
-        res.status(200).json({ message: 'Billing deleted successfully' });
+        console.log("Billing deleted successfully");
+        res.status(200).json("Billing deleted successfully");
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
