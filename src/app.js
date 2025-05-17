@@ -1,10 +1,11 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import { chatRoutes } from './routes/chat.js';
-import { io } from './server.js';
-import run from './utils/mongo.js';
-import { billingRouter } from './routes/billing.js';
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import { chatRoutes } from "./routes/chat.js";
+import { io } from "./server.js";
+import run from "./utils/mongo.js";
+import { billingRouter } from "./routes/billing.js";
+import { userRoutes } from "./routes/user.js";
 
 dotenv.config();
 const app = express();
@@ -15,12 +16,17 @@ app.use(express.urlencoded({ extended: true }));
 
 // app.use('/api/users',);
 
-app.use('/chat', (req, res, next) => {
+app.use(
+  "/chat",
+  (req, res, next) => {
     req.io = io;
     next();
-}, chatRoutes);
+  },
+  chatRoutes
+);
 
-app.use('/billing', billingRouter);
+app.use("/billing", billingRouter);
+app.use("/user", userRoutes);
 
 run();
 export default app;

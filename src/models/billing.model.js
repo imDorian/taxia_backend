@@ -30,6 +30,7 @@ const billingSchema = new Schema({
     },
     date: { type: Date, required: true },
     description: { type: String, required: false },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
 });
 
 const Billing = mongoose.model('Billing', billingSchema);
