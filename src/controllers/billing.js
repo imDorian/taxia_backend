@@ -1,14 +1,18 @@
+import { isValidToken } from "../middlewares/isValidToken.js";
 import Billing from "../models/billing.model.js";
 import Fuel from "../models/fuel.model.js";
+import jwt from "jsonwebtoken";
 export const createBilling = async (req, res) => {
   try {
     const newBilling = req.body;
-    const { earnings, mistakes, fuel, apps, date, description } = newBilling;
+    const { earnings, mistakes, fuel, apps, date, description, user } =
+      newBilling;
     const billing = new Billing({
       earnings,
       mistakes,
       date,
       description,
+      user,
     });
 
     if (Number(fuel.amount) > 0) {
@@ -31,10 +35,12 @@ export const createBilling = async (req, res) => {
   }
 };
 
-export const getBilling = async (req, res) => {
+export const getBillings = async (req, res) => {
+  const token = req._user;
   try {
-    const billing = await Billing.find().sort({ date: -1 }).populate("fuel");
-    console.log(billing, "billing");
+    const billing = await Billing.find({ user: token.id })
+      .sort({ date: -1 })
+      .populate("fuel");
     res.status(200).json(billing);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -64,8 +70,8 @@ export const deleteBilling = async (req, res) => {
 };
 
 export const getBillingById = async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
     const billing = await Billing.findById(id).populate("fuel");
     res.status(200).json(billing);
   } catch (error) {

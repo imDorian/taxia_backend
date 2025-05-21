@@ -6,6 +6,7 @@ import { io } from "./server.js";
 import run from "./utils/mongo.js";
 import { billingRouter } from "./routes/billing.js";
 import { userRoutes } from "./routes/user.js";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 const app = express();
@@ -13,6 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // app.use('/api/users',);
 

@@ -43,11 +43,9 @@ async function getMessage(req, res) {
     const { geoPoint } = req.query;
     const events = await getTicketMaster(geoPoint);
     const arrivals = await getFlights();
-    console.log(arrivals);
     const context = JSON.stringify(events)
       .concat(JSON.stringify(arrivals))
       .concat(contextIA);
-    console.log(context, "context");
 
     const response = await ai.models.generateContentStream({
       model: "gemini-2.0-flash",
@@ -238,42 +236,10 @@ async function getFlights() {
   }
 }
 
-async function getChat(id) {
-  const chat = await Chat.findOne({ user: id });
+async function getChat(req, res) {
+  const chat = await Chat.findOne({ user: req._user.id });
   console.log(chat);
 }
-
-// timeRange: { type: String },
-//         locationName: { type: String },
-//         reason: { type: String },
-//         arrivalTime: { type: String },
-//         departureTime: { type: String },
-//         demandLevel: { type: String },
-//         googleMaps: { type: String },
-//         waze: { type: String },
-//         notes: { type: String },
-const userID = "68268790d89d0e65137c1c6f";
-async function createChat() {
-  const newMess = {
-    locationName: "MICASA",
-    reason: "porque si",
-    arrivalTime: "10:00",
-    departureTime: "12:00",
-    demandLevel: "Alto",
-    googleMaps: "",
-    waze: "",
-    notes: "BRRR",
-  };
-  const newChat = new Chat();
-  newChat.chat.push(newMess);
-  newChat.user = userID;
-  await newChat.save();
-  console.log(newChat);
-}
-
-// createChat();
-getChat(userID);
-// deleteChat(ide);
 
 const job = new CronJob(
   "0 */12 * * *",
@@ -287,4 +253,4 @@ const job = new CronJob(
   false
 );
 
-export { getMessage, getWeather, getTicketMaster };
+export { getMessage, getWeather, getTicketMaster, getChat };
