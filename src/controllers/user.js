@@ -6,16 +6,22 @@ import cookieParser from "cookie-parser";
 import Chat from "../models/chat.model.js";
 
 export async function getUser(req, res) {
-  const user = await User.findById(req._user.id);
-  const { _id, name, lastName, email, number } = user;
-  const userData = {
-    _id,
-    name,
-    lastName,
-    email,
-    number,
-  };
-  return res.json(userData);
+  try {
+    const user = await User.findById(req._user.id);
+    const { _id, name, lastName, email, number } = user;
+    const userData = {
+      _id,
+      name,
+      lastName,
+      email,
+      number,
+    };
+    return res.json(userData);
+  } catch (error) {
+    return res
+      .status(404)
+      .json({ error: "Error al intentar recuperar el usuario" });
+  }
 }
 
 export async function getUsers() {
@@ -41,7 +47,7 @@ export async function login(req, res) {
         },
         process.env.JWT,
         {
-          expiresIn: "1h",
+          expiresIn: "7d",
         }
       );
       return res.json(token);

@@ -1,20 +1,13 @@
 import dotenv from "dotenv";
-import { GoogleGenAI, Type } from "@google/genai";
-import { contextIA } from "../utils/contextIA.js";
-import { io } from "../server.js";
 import Flight from "../models/flight.model.js";
 import { CronJob } from "cron";
-import Chat from "../models/chat.model.js";
+import Terminal from "../models/terminal.model.js";
 
 dotenv.config();
 
 const API_URL = "http://api.aviationstack.com/v1/timetable";
 const API_KEY = process.env.AVIATION_KEY;
 const IATA_CODE = "MAD";
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_KEY,
-});
 
 async function getWeather(req, res) {
   const { lat, lon } = req.query;
@@ -38,123 +31,6 @@ async function getWeather(req, res) {
   }
 }
 
-async function getMessage(req, res) {
-  try {
-    const { geoPoint } = req.query;
-    const events = await getTicketMaster(geoPoint);
-    const arrivals = await getFlights();
-    const context = JSON.stringify(events)
-      .concat(JSON.stringify(arrivals))
-      .concat(contextIA);
-
-    const response = await ai.models.generateContentStream({
-      model: "gemini-2.0-flash",
-      contents: context,
-      config: {
-        // tokenLimit: 6000,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              timeRange: {
-                type: Type.STRING,
-                description: "Hora de inicio y fin del evento",
-                nullable: false,
-              },
-              image: {
-                type: Type.STRING,
-                description: "URL de la imagen del evento",
-                nullable: false,
-              },
-              locationName: {
-                type: Type.STRING,
-                description: "Nombre del lugar del evento",
-                nullable: false,
-              },
-              reason: {
-                type: Type.STRING,
-                description: "Motivo por el que se ha seleccionado el evento",
-                nullable: false,
-              },
-              arrivalTime: {
-                type: Type.STRING,
-                description: "Hora de llegada al evento",
-                nullable: false,
-              },
-              departureTime: {
-                type: Type.STRING,
-                description: "Hora de salida del evento",
-                nullable: false,
-              },
-              demandLevel: {
-                type: Type.STRING,
-                description: "Nivel de afluencia en el evento",
-                nullable: false,
-              },
-              googleMaps: {
-                type: Type.STRING,
-                description: "URL de Google Maps del evento",
-                nullable: false,
-              },
-              waze: {
-                type: Type.STRING,
-                description: "URL de Waze del evento",
-                nullable: false,
-              },
-              notes: {
-                type: Type.STRING,
-                description: "Notas adicionales sobre el evento",
-                nullable: false,
-              },
-              id: {
-                type: Type.STRING,
-                description: "inventate un id para cada evento",
-                nullable: false,
-              },
-            },
-            required: [
-              "timeRange",
-              "locationName",
-              "reason",
-              "arrivalTime",
-              "departureTime",
-              "demandLevel",
-              "googleMaps",
-              "waze",
-              "notes",
-              "id",
-            ],
-          },
-        },
-      },
-    });
-
-    let responseObj = "";
-    for await (const chunk of response) {
-      for (const letter of chunk.text) {
-        if (letter === "{") {
-          responseObj += letter;
-        }
-        if (responseObj.length > 0 && letter !== "}" && letter !== "{") {
-          responseObj += letter;
-        }
-        if (letter === "}") {
-          responseObj += letter;
-          io.emit("newMessage", JSON.parse(responseObj));
-
-          responseObj = "";
-        }
-      }
-    }
-
-    res.end();
-  } catch (error) {
-    console.log(error.message, "error");
-  }
-}
-
 async function getTicketMaster(geoPoint) {
   const url = `https://app.ticketmaster.com/discovery/v2/events.json?countryCode=ES&apikey=${process.env.TICKET_KEY}&locale=es-es&sort=relevance,desc&geoPoint=${geoPoint}&unit=km`;
   // ;
@@ -162,68 +38,83 @@ async function getTicketMaster(geoPoint) {
   const url3 = `https://app.ticketmaster.com/discovery/v2/suggest.json?apikey=${process.env.TICKET_KEY}&sort=distance,asc&geoPoint=${geoPoint}&locale=es-es`;
   const response = await fetch(url);
   const json = await response.json();
-  const events = json._embedded.events?.map((event) => {
-    return {
-      name: event.name,
-      image: event.images[1].url,
-      venue: event._embedded.venues[0]?.name,
-      street: event._embedded.venues[0]?.address?.line1,
-      city: event._embedded.venues[0]?.city?.name,
-      country: event._embedded.venues[0]?.country?.name,
-      date: event.dates.start.dateTime,
-      url: event.url,
-      distance: event.distance,
-      id: event.id,
-    };
-  });
 
+  const today = new Date().toISOString().split("T")[0]; // formato 'YYYY-MM-DD'
+
+  const events = json._embedded.events
+    // ?.filter((event) => event.dates.start.localDate === today)
+    .map((event) => {
+      return {
+        name: event.name,
+        image: event.images[1]?.url,
+        venue: event._embedded.venues[0]?.name,
+        street: event._embedded.venues[0]?.address?.line1,
+        city: event._embedded.venues[0]?.city?.name,
+        country: event._embedded.venues[0]?.country?.name,
+        date: event.dates.start,
+        url: event.url,
+        distance: event.distance,
+        id: event.id,
+      };
+    });
+  console.log(events);
   return events;
 }
 
 async function getArrivalsWithin12Hours() {
   const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
   const in12h = new Date(now.getTime() + 12 * 60 * 60 * 1000);
   const dateStr = now.toISOString().split("T")[0];
   const url = `${API_URL}?access_key=${API_KEY}&iataCode=${IATA_CODE}&type=arrival&date=${dateStr}`;
 
   try {
     const response = await fetch(url);
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+
     const data = await response.json();
+    if (!data.data || !Array.isArray(data.data)) {
+      throw new Error("Formato de datos inesperado");
+    }
 
     const filtered = data.data.filter((flight) => {
       const arrivalTimeStr = flight.arrival?.scheduledTime;
       if (!arrivalTimeStr) return false;
       const arrivalDate = new Date(arrivalTimeStr);
-      return arrivalDate >= now && arrivalDate <= in12h;
+      return arrivalDate >= oneHourAgo && arrivalDate <= in12h;
     });
 
-    for (const f of filtered) {
-      const airline = f.airline.name;
-      const terminal = f.arrival.terminal;
-      const scheduledTime = f.arrival.scheduledTime;
-      const delay = f.arrival?.delay;
-      const flight = f.flight.iataNumber;
-      const status = f.status;
-      const departureCode = f.departure.iataCode;
-
-      await Flight.findOneAndUpdate(
-        { flight },
-        {
-          airline,
-          status,
-          terminal,
-          scheduledTime,
-          delay,
-          departureCode,
-          flight,
-        },
-        { upsert: true, new: true }
-      );
+    if (filtered.length === 0) {
+      console.log("No hay vuelos entre hace 1 hora y las próximas 12 horas.");
+      return [];
     }
 
-    console.log(`Guardados ${filtered.length} vuelos.`);
+    const flights = filtered.map((f) => ({
+      airline: f.airline.name,
+      terminal: f.arrival.terminal,
+      scheduledTime: f.arrival.scheduledTime,
+      delay: f.arrival?.delay,
+      flight: f.flight.iataNumber,
+      status: f.status,
+      departure: f.departure.iataCode,
+    }));
+
+    // Borrar solo vuelos dentro del rango actualizado
+    await Flight.deleteMany({
+      scheduledTime: {
+        $gte: oneHourAgo.toISOString(),
+        $lte: in12h.toISOString(),
+      },
+    });
+
+    const isSaved = await Flight.insertMany(flights);
+
+    console.log(`Guardados ${isSaved.length} vuelos.`);
+
+    return isSaved;
   } catch (err) {
     console.error("Error al consultar vuelos:", err);
+    throw err;
   }
 }
 
@@ -237,14 +128,52 @@ async function getFlights() {
 }
 
 async function getChat(req, res) {
-  const chat = await Chat.findOne({ user: req._user.id });
-  console.log(chat);
+  const { geoPoint } = req.query;
+  console.log(geoPoint);
+  try {
+    const flights = await Terminal.findOne()
+      .populate("terminal1")
+      .populate("terminal2")
+      .populate("terminal4");
+
+    const events = await getTicketMaster(geoPoint);
+    console.log(events);
+
+    return res.status(200).json({ flights, events });
+  } catch (error) {
+    return res.status(404).json({ error: "el chat no se ha encontrado" });
+  }
+}
+
+async function createRangeFlight() {
+  const flights = await Flight.find();
+  const terminal1 = flights.filter((f) => f.terminal === "1");
+  const terminal2 = flights.filter((f) => f.terminal === "2");
+  const terminal4 = flights.filter(
+    (f) => f.terminal === "4" || f.terminal === "4S"
+  );
+  const terminal = await Terminal.deleteMany();
+  const newTerminal = new Terminal();
+  newTerminal.terminal1 = terminal1;
+  newTerminal.terminal2 = terminal2;
+  newTerminal.terminal4 = terminal4;
+  newTerminal.date = new Date().toLocaleDateString("es-Es", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  await newTerminal.save();
+  return;
 }
 
 const job = new CronJob(
   "0 */12 * * *",
   async function () {
     await getArrivalsWithin12Hours();
+    await createRangeFlight();
   },
   null,
   true,
@@ -253,4 +182,21 @@ const job = new CronJob(
   false
 );
 
-export { getMessage, getWeather, getTicketMaster, getChat };
+const keepAliveJob = new CronJob(
+  "*/14 * * * *", // cada 14 minutos
+  async function () {
+    try {
+      const res = await fetch(process.env.URL + "/ping");
+      console.log(`Ping enviado. Estado: ${res.status}`);
+    } catch (err) {
+      console.error("Error haciendo ping al backend:", err.message);
+    }
+  },
+  null,
+  true,
+  null,
+  null,
+  true
+);
+
+export { getWeather, getTicketMaster, getChat };

@@ -16,7 +16,3 @@ billingRouter.get("/get-billing/:id", [isValidToken], getBillingById);
 billingRouter.put("/update-billing/:id", updateBilling);
 billingRouter.delete("/delete-billing/:id", [isValidToken], deleteBilling);
 export { billingRouter };
-
-// app.get('/billing', getBilling);
-// app.put('/billing/:id', updateBilling);
-// app.delete('/billing/:id', deleteBilling);
