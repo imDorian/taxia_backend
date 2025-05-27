@@ -77,19 +77,21 @@ async function getArrivalsWithin12Hours() {
       throw new Error("Formato de datos inesperado");
     }
 
-    const filtered = data.data.filter((flight) => {
-      const arrivalTimeStr = flight.arrival?.scheduledTime;
-      if (!arrivalTimeStr) return false;
-      const arrivalDate = new Date(arrivalTimeStr);
-      return arrivalDate >= oneHourAgo && arrivalDate <= in12h;
-    });
+    // const filtered = data.data.filter((flight) => {
+    //   const arrivalTimeStr = flight.arrival?.scheduledTime;
+    //   const arrivalTimeEst = flight.arrival?.estimatedTime;
+    //   if (!arrivalTimeStr) return false;
+    //   const arrivalDate = new Date(arrivalTimeStr);
+    //   const arrivalDateEst = new Date(arrivalTimeEst);
+    //   return arrivalDateEst >= oneHourAgo || arrivalDate >= oneHourAgo;
+    // });
 
-    if (filtered.length === 0) {
-      console.log("No hay vuelos entre hace 1 hora y las próximas 12 horas.");
-      return [];
-    }
+    // if (filtered.length === 0) {
+    //   console.log("No hay vuelos entre hace 1 hora y las próximas 12 horas.");
+    //   return [];
+    // }
 
-    const flights = filtered.map((f) => ({
+    const flights = data.data.map((f) => ({
       airline: f.airline.name,
       terminal: f.arrival.terminal,
       scheduledTime: f.arrival.scheduledTime,
@@ -97,15 +99,11 @@ async function getArrivalsWithin12Hours() {
       flight: f.flight.iataNumber,
       status: f.status,
       departure: f.departure.iataCode,
+      estimatedTime: f.arrival.estimatedTime,
     }));
 
     // Borrar solo vuelos dentro del rango actualizado
-    await Flight.deleteMany({
-      scheduledTime: {
-        $gte: oneHourAgo.toISOString(),
-        $lte: in12h.toISOString(),
-      },
-    });
+    await Flight.deleteMany();
 
     const isSaved = await Flight.insertMany(flights);
 
@@ -179,7 +177,7 @@ const job = new CronJob(
   true,
   null,
   null,
-  false
+  true
 );
 
 const keepAliveJob = new CronJob(
