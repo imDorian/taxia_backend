@@ -167,18 +167,28 @@ async function createRangeFlight() {
   return;
 }
 
-const job = new CronJob(
-  "0 */12 * * *",
-  async function () {
-    await getArrivalsWithin12Hours();
-    await createRangeFlight();
-  },
-  null,
-  true,
-  null,
-  null,
-  true
-);
+const jobMorning = new CronJob("30 6 * * *", async () => {
+  await getArrivalsWithin12Hours();
+  await createRangeFlight();
+  console.log("🚀 Actualización matutina completada");
+});
+
+const jobAfternoon = new CronJob("30 13 * * *", async () => {
+  await getArrivalsWithin12Hours();
+  await createRangeFlight();
+  console.log("🌞 Actualización de mediodía completada");
+});
+
+const jobEvening = new CronJob("30 20 * * *", async () => {
+  await getArrivalsWithin12Hours();
+  await createRangeFlight();
+  console.log("🌙 Actualización nocturna completada");
+});
+
+// Iniciar los jobs
+jobMorning.start();
+jobAfternoon.start();
+jobEvening.start();
 
 const keepAliveJob = new CronJob(
   "*/14 * * * *", // cada 14 minutos
